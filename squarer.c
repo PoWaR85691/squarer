@@ -130,13 +130,13 @@ static ssize_t squarer_read(struct file *file, char __user *buf, size_t count, l
 }
 
 static ssize_t squarer_write(struct file *file, const char __user *buf, size_t count, loff_t *pos) {
-    if (*pos >= BUF_SIZE) {
+    if (*pos >= BUF_SIZE - 1) {
         return -EINVAL;
     }
-    if (*pos + count > BUF_SIZE) {
-        count = BUF_SIZE - *pos;
+    if (*pos + count > BUF_SIZE - 1) {
+        count = BUF_SIZE - 1 - *pos;
     }
-    if (copy_from_user(input + *pos, buf, count)) {
+    if (copy_from_user(input + *pos, buf, count) != EOK) {
         return -EINVAL;
     }
 
