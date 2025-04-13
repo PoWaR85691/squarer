@@ -5,17 +5,15 @@
 #include <linux/string.h>
 #include <linux/uaccess.h>
 
-#define DRIVER "squarer"
-
 #define EOK 0
 
 static int dev_open = 0;
 
 static int dev_major = 0;
-#define DEV_FIRST 0
-#define DEV_COUNT 1
-#define DEV_GROUP "squarer"
+#define DEV_NAME "squarer"
 
+static struct class *dev_class;
+static struct device *dev_device;
 static struct cdev squarer_dev;
 
 static int squarer_open(struct inode *inode, struct file *file);
@@ -38,38 +36,50 @@ static int input_pos = 0;
 static int output_pos = 0;
 
 static int __init squarer_init(void) {
-    int res = EOK;
-
     dev_t dev = 0;
-    res = alloc_chrdev_region(&dev, DEV_FIRST, DEV_COUNT, DEV_GROUP);
+    if (alloc_chrdev_region(&dev, 0, 1, DEV_NAME) < 0) {
+        goto err_alloc_chrdev_region;
+    }
     dev_major = MAJOR(dev);
 
-    if (res < 0) {
-        printk(KERN_CRIT "%s: char device didn't created\n", DRIVER);
-        goto err;
+    dev_class = class_create(DEV_NAME);
+    if (IS_ERR(dev_class)) {
+        goto err_class_create;
+    }
+
+    dev_device = device_create(dev_class, NULL, MKDEV(dev_major, 0), NULL, DEV_NAME);
+    if (IS_ERR(dev_device)) {
+        goto err_device_create;
     }
 
     cdev_init(&squarer_dev, &squarer_fops);
     squarer_dev.owner = THIS_MODULE;
 
-    res = cdev_add(&squarer_dev, MKDEV(dev_major, DEV_FIRST), DEV_COUNT);
-    if (res < 0) {
-        printk(KERN_CRIT "%s: device files didn't created\n", DRIVER);
-        goto err;
+    if (cdev_add(&squarer_dev, MKDEV(dev_major, 0), 1) < 0) {
+        goto err_cdev_add;
     }
 
-    printk(KERN_INFO "%s: loaded\n", DRIVER);
-    return EOK;
+    printk(KERN_INFO "%s: loaded\n", DEV_NAME);
+    return 0;
 
-err:
-    unregister_chrdev_region(MKDEV(dev_major, DEV_FIRST), DEV_COUNT);
-    return res;
+err_cdev_add:
+    cdev_del(&squarer_dev);
+    device_destroy(dev_class, MKDEV(dev_major, 0));
+err_device_create:
+    class_destroy(dev_class);
+err_class_create:
+    unregister_chrdev_region(MKDEV(dev_major, 0), 1);
+err_alloc_chrdev_region:
+    printk(KERN_CRIT "%s: module didn't loaded\n", DEV_NAME);
+    return 1;
 }
 
 static void __exit squarer_exit(void) {
     cdev_del(&squarer_dev);
-    unregister_chrdev_region(MKDEV(dev_major, DEV_FIRST), DEV_COUNT);
-    printk(KERN_INFO "%s: unloaded\n", DRIVER);
+    device_destroy(dev_class, MKDEV(dev_major, 0));
+    class_destroy(dev_class);
+    unregister_chrdev_region(MKDEV(dev_major, 0), 1);
+    printk(KERN_INFO "%s: unloaded\n", DEV_NAME);
 }
 
 static int squarer_open(struct inode *inode, struct file *file) {
@@ -96,8 +106,8 @@ static int squarer_release(struct inode *inode, struct file *file) {
         }
         snprintf(output, BUF_SIZE, "%llu\n", res); 
 
-        printk(KERN_INFO "%s in: %s", DRIVER, input);
-        printk(KERN_INFO "%s out: %s", DRIVER, output);
+        printk(KERN_INFO "%s in: %s", DEV_NAME, input);
+        printk(KERN_INFO "%s out: %s", DEV_NAME, output);
     }
 
     return EOK;

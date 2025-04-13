@@ -5,20 +5,21 @@ The driver creates a device for calculating squares of integers.
 ## Usage
 
 ```sh
-$ echo 123 > /dev/squarer
-$ cat /dev/squarer
+$ echo 123 | sudo tee /dev/squarer
+123
+$ sudo cat /dev/squarer
 15129
 ```
 
 ## Build and install
 
 ```sh
-$ make && sudo make install
+$ make && sudo insmod squarer.ko
 ```
 
 ## Uninstalling
 
-You can reboot your device or call
+You can reboot your computer or call
 ```sh
-$ sudo make uninstall
+$ sudo rmmod squarer
 ```

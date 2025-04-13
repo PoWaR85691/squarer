@@ -5,3 +5,5 @@
 *.cmd
 *.symvers
 *.order
+
+.vscode/
